@@ -36,6 +36,9 @@
 #include "reset.h"
 #include "trace2.h"
 #include "hook.h"
+#include "trailer.h"
+
+static const char trailer_state_name[] = "trailer";
 
 static char const * const builtin_rebase_usage[] = {
 	N_("git rebase [-i] [options] [--exec <cmd>] "
@@ -45,6 +48,8 @@ static char const * const builtin_rebase_usage[] = {
 	"git rebase --continue | --abort | --skip | --edit-todo",
 	NULL
 };
+
+static struct strvec trailer_args = STRVEC_INIT;
 
 static GIT_PATH_FUNC(path_squash_onto, "rebase-merge/squash-onto")
 static GIT_PATH_FUNC(path_interactive, "rebase-merge/interactive")
@@ -114,6 +119,7 @@ struct rebase_options {
 	char *reflog_action;
 	int signoff;
 	int reviewby;
+	struct strvec trailer_args;
 	int allow_rerere_autoupdate;
 	int keep_empty;
 	int autosquash;
@@ -144,6 +150,7 @@ struct rebase_options {
 		.flags = REBASE_NO_QUIET, 		\
 		.git_am_opts = STRVEC_INIT,		\
 		.exec = STRING_LIST_INIT_NODUP,		\
+		.trailer_args = STRVEC_INIT,  \
 		.git_format_patch_opt = STRBUF_INIT,	\
 		.fork_point = -1,			\
 		.reapply_cherry_picks = -1,             \
@@ -167,6 +174,7 @@ static void rebase_options_release(struct rebase_options *opts)
 	free(opts->strategy);
 	string_list_clear(&opts->strategy_opts, 0);
 	strbuf_release(&opts->git_format_patch_opt);
+	strvec_clear(&opts->trailer_args);
 }
 
 static struct replay_opts get_replay_opts(const struct rebase_options *opts)
@@ -179,6 +187,10 @@ static struct replay_opts get_replay_opts(const struct rebase_options *opts)
 
 	replay.signoff = opts->signoff;
 	replay.reviewby = opts->reviewby;
+
+	for (size_t i = 0; i < opts->trailer_args.nr; i++)
+        strvec_push(&replay.trailer_args, opts->trailer_args.v[i]);
+
 	replay.allow_ff = !(opts->flags & REBASE_FORCE);
 	if (opts->allow_rerere_autoupdate)
 		replay.allow_rerere_auto = opts->allow_rerere_autoupdate;
@@ -437,6 +449,8 @@ static int read_basic_state(struct rebase_options *opts)
 	struct strbuf head_name = STRBUF_INIT;
 	struct strbuf buf = STRBUF_INIT;
 	struct object_id oid;
+	struct strbuf t = STRBUF_INIT, one = STRBUF_INIT;
+	const char *path = state_dir_path(trailer_state_name, opts);
 
 	if (!read_oneliner(&head_name, state_dir_path("head-name", opts),
 			   READ_ONELINER_WARN_MISSING) ||
@@ -509,6 +523,22 @@ static int read_basic_state(struct rebase_options *opts)
 
 	strbuf_release(&buf);
 
+	if (strbuf_read_file(&t, path, 0) >= 0) {
+		const char *p = t.buf, *end = t.buf + t.len;
+
+		while (p < end) {
+			const char *nl = memchr(p, '\n', end - p);
+			strbuf_reset(&one);
+			strbuf_add(&one, p, nl ? nl - p : end - p);
+			if (one.len) /* skip empty line */
+				strvec_push(&opts->trailer_args,
+					    strbuf_detach(&one, NULL));
+			p = nl ? nl + 1 : end;
+		}
+		strbuf_release(&one);
+	}
+	strbuf_release(&t);
+
 	return 0;
 }
 
@@ -536,6 +566,28 @@ static int rebase_write_basic_state(struct rebase_options *opts)
 		write_file(state_dir_path("signoff", opts), "--signoff");
 	if (opts->reviewby)
 		write_file(state_dir_path("reviewby", opts), "--reviewby");
+
+    /*
+     * save opts->trailer_args into state_dir/trailer
+     */
+    if (opts->trailer_args.nr) {
+            struct strbuf buf = STRBUF_INIT;
+            size_t i;
+
+            for (i = 0; i < opts->trailer_args.nr; i++) {
+                    strbuf_addstr(&buf, opts->trailer_args.v[i]);
+                    strbuf_addch(&buf, '\n');
+            }
+            write_file(state_dir_path(trailer_state_name, opts),
+                       "%s", buf.buf);
+            strbuf_release(&buf);
+    } else {
+            /*
+             * but if rebase doesn't pass any --trailer，
+             * and state dir still have residual files，let's delete it。
+             */
+            unlink_or_warn(state_dir_path(trailer_state_name, opts));
+    }
 
 	return 0;
 }
@@ -1140,6 +1192,7 @@ int cmd_rebase(int argc,
 			.flags = PARSE_OPT_NOARG,
 			.defval = REBASE_DIFFSTAT,
 		},
+		OPT_PASSTHRU_ARGV(0, "trailer", &trailer_args, N_("trailer"), N_("add custom trailer(s)"), PARSE_OPT_NONEG),
 		OPT_BOOL(0, "signoff", &options.signoff,
 			 N_("add a Signed-off-by trailer to each commit")),
 		OPT_BOOL(0, "reviewby", &options.reviewby,
@@ -1291,6 +1344,13 @@ int cmd_rebase(int argc,
 	argc = parse_options(argc, argv, prefix,
 			     builtin_rebase_options,
 			     builtin_rebase_usage, 0);
+
+    for (i = 0; i < trailer_args.nr; i++)
+ 	   strvec_push(&options.trailer_args, trailer_args.v[i]);
+
+    /* if add --trailer，force rebase */
+    if (options.trailer_args.nr)
+		   options.flags |= REBASE_FORCE;
 
 	if (preserve_merges_selected)
 		die(_("--preserve-merges was replaced by --rebase-merges\n"
@@ -1548,6 +1608,16 @@ int cmd_rebase(int argc,
 
 	if (options.root && !options.onto_name)
 		imply_merge(&options, "--root without --onto");
+
+	/*
+	 * The apply‑based backend (git am) cannot append trailers because
+	 * it lacks a message‑filter facility.  Reject early, before any
+	 * state (index, HEAD, etc.) is modified.
+	 */
+	if (options.type == REBASE_APPLY && options.trailer_args.nr)
+		die(_("the --apply backend (git am) cannot currently handle "
+		      "--trailer; please omit --apply or use "
+		      "the merge/interactive backend"));
 
 	if (isatty(2) && options.flags & REBASE_NO_QUIET)
 		strbuf_addstr(&options.git_format_patch_opt, " --progress");
