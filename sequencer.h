@@ -17,6 +17,7 @@ const char *rebase_path_dropped(void);
 extern const char *rebase_resolvemsg;
 
 #define APPEND_SIGNOFF_DEDUP (1u << 0)
+#define APPEND_REVIEWBY_DEDUP (1u << 1)
 
 enum replay_action {
 	REPLAY_REVERT,
@@ -44,6 +45,7 @@ struct replay_opts {
 	int record_origin;
 	int no_commit;
 	int signoff;
+	int reviewby;
 	int allow_ff;
 	int allow_rerere_auto;
 	int allow_empty;
@@ -204,6 +206,14 @@ int todo_list_rearrange_squash(struct todo_list *todo_list);
  * and the new signoff will be spliced into the buffer before those bytes.
  */
 void append_signoff(struct strbuf *msgbuf, size_t ignore_footer, unsigned flag);
+
+/*
+ * Append a reviewby to the commit message in "msgbuf". The ignore_footer
+ * parameter specifies the number of bytes at the end of msgbuf that should
+ * not be considered at all. I.e., they are not checked for existing trailers,
+ * and the new reviewby will be spliced into the buffer before those bytes.
+ */
+void append_reviewby(struct strbuf *msgbuf, size_t ignore_footer, unsigned flag);
 
 void append_conflicts_hint(struct index_state *istate,
 		struct strbuf *msgbuf, enum commit_msg_cleanup_mode cleanup_mode);

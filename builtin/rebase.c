@@ -113,6 +113,7 @@ struct rebase_options {
 	enum action action;
 	char *reflog_action;
 	int signoff;
+	int reviewby;
 	int allow_rerere_autoupdate;
 	int keep_empty;
 	int autosquash;
@@ -177,6 +178,7 @@ static struct replay_opts get_replay_opts(const struct rebase_options *opts)
 	sequencer_init_config(&replay);
 
 	replay.signoff = opts->signoff;
+	replay.reviewby = opts->reviewby;
 	replay.allow_ff = !(opts->flags & REBASE_FORCE);
 	if (opts->allow_rerere_autoupdate)
 		replay.allow_rerere_auto = opts->allow_rerere_autoupdate;
@@ -477,6 +479,10 @@ static int read_basic_state(struct rebase_options *opts)
 		opts->signoff = 1;
 		opts->flags |= REBASE_FORCE;
 	}
+	if (file_exists(state_dir_path("reviewby", opts))) {
+		opts->reviewby = 1;
+		opts->flags |= REBASE_FORCE;
+	}
 
 	if (file_exists(state_dir_path("allow_rerere_autoupdate", opts))) {
 		strbuf_reset(&buf);
@@ -528,6 +534,8 @@ static int rebase_write_basic_state(struct rebase_options *opts)
 			   opts->gpg_sign_opt);
 	if (opts->signoff)
 		write_file(state_dir_path("signoff", opts), "--signoff");
+	if (opts->reviewby)
+		write_file(state_dir_path("reviewby", opts), "--reviewby");
 
 	return 0;
 }
@@ -1134,6 +1142,8 @@ int cmd_rebase(int argc,
 		},
 		OPT_BOOL(0, "signoff", &options.signoff,
 			 N_("add a Signed-off-by trailer to each commit")),
+		OPT_BOOL(0, "reviewby", &options.reviewby,
+			 N_("add a Reviewed-by trailer to each commit")),
 		OPT_BOOL(0, "committer-date-is-author-date",
 			 &options.committer_date_is_author_date,
 			 N_("make committer date match author date")),
@@ -1616,6 +1626,10 @@ int cmd_rebase(int argc,
 
 	if (options.signoff) {
 		strvec_push(&options.git_am_opts, "--signoff");
+		options.flags |= REBASE_FORCE;
+	}
+	if (options.reviewby) {
+		strvec_push(&options.git_am_opts, "--reviewby");
 		options.flags |= REBASE_FORCE;
 	}
 

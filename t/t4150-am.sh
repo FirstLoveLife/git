@@ -491,6 +491,7 @@ test_expect_success 'am changes committer and keeps author' '
 	     "$(git log -1 --pretty=format:"%cn <%ce>" HEAD)"
 '
 
+########################## signoff begin ##########################
 test_expect_success 'am --signoff adds Signed-off-by: line' '
 	rm -fr .git/rebase-apply &&
 	git reset --hard &&
@@ -572,6 +573,80 @@ test_expect_success 'am without --keep removes Re: and [PATCH] stuff' '
 	git rev-parse topic_2 >actual &&
 	test_cmp expected actual
 '
+########################## signoff end ##########################
+
+########################## review begin ##########################
+test_expect_success 'am --review adds Reviewed-by: line' '
+	rm -fr .git/rebase-apply &&
+	git reset --hard &&
+	git checkout -b topic_3 first &&
+	git am --reviewby <patch2 &&
+	{
+		printf "third\n\nReviewed-by: %s <%s>\n\n" \
+			"$GIT_COMMITTER_NAME" "$GIT_COMMITTER_EMAIL" &&
+		cat msg &&
+		printf "Reviewed-by: %s <%s>\n\n" \
+			"$GIT_COMMITTER_NAME" "$GIT_COMMITTER_EMAIL"
+	} >expected-log &&
+	git log --pretty=%B -2 HEAD >actual &&
+	test_cmp expected-log actual
+'
+test_expect_success 'am stays in branch' '
+	echo refs/heads/topic_3 >expected &&
+	git symbolic-ref HEAD >actual &&
+	test_cmp expected actual
+'
+
+test_expect_success 'am --reviewby does not add Reviewed-by: line if already there' '
+	git format-patch --stdout first >patch3 &&
+	git reset --hard first &&
+	git am --reviewby <patch3 &&
+	git log --pretty=%B -2 HEAD >actual &&
+	test_cmp expected-log actual
+'
+
+test_expect_success 'am --reviewby adds Reviewed-by: if another author is preset' '
+	NAME="A N Other" &&
+	EMAIL="a.n.other@example.com" &&
+	{
+		printf "third\n\nReviewed-by: %s <%s>\nReviewed-by: %s <%s>\n\n" \
+			"$GIT_COMMITTER_NAME" "$GIT_COMMITTER_EMAIL" \
+			"$NAME" "$EMAIL" &&
+		cat msg &&
+		printf "Reviewed-by: %s <%s>\nReviewed-by: %s <%s>\n\n" \
+			"$GIT_COMMITTER_NAME" "$GIT_COMMITTER_EMAIL" \
+			"$NAME" "$EMAIL"
+	} >expected-log &&
+	git reset --hard first &&
+	GIT_COMMITTER_NAME="$NAME" GIT_COMMITTER_EMAIL="$EMAIL" \
+		git am --reviewby <patch3 &&
+	git log --pretty=%B -2 HEAD >actual &&
+	test_cmp expected-log actual
+'
+
+test_expect_success 'am --reviewby duplicates Reviewed-by: if it is not the last one' '
+	NAME="A N Other" &&
+	EMAIL="a.n.other@example.com" &&
+	{
+		printf "third\n\nReviewed-by: %s <%s>\n\
+Reviewed-by: %s <%s>\nReviewed-by: %s <%s>\n\n" \
+			"$GIT_COMMITTER_NAME" "$GIT_COMMITTER_EMAIL" \
+			"$NAME" "$EMAIL" \
+			"$GIT_COMMITTER_NAME" "$GIT_COMMITTER_EMAIL" &&
+		cat msg &&
+		printf "Reviewed-by: %s <%s>\nReviewed-by: %s <%s>\n\
+Reviewed-by: %s <%s>\n\n" \
+			"$GIT_COMMITTER_NAME" "$GIT_COMMITTER_EMAIL" \
+			"$NAME" "$EMAIL" \
+			"$GIT_COMMITTER_NAME" "$GIT_COMMITTER_EMAIL"
+	} >expected-log &&
+	git format-patch --stdout first >patch3 &&
+	git reset --hard first &&
+	git am --reviewby <patch3 &&
+	git log --pretty=%B -2 HEAD >actual &&
+	test_cmp expected-log actual
+'
+########################## review end ##########################
 
 test_expect_success 'am --keep really keeps the subject' '
 	rm -fr .git/rebase-apply &&

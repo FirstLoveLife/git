@@ -89,6 +89,12 @@ enum signoff_type {
 	SIGNOFF_EXPLICIT /* --signoff was set on the command-line */
 };
 
+enum reviewby_type {
+	REVIEWBY_FALSE = 0,
+	REVIEWBY_TRUE = 1,
+	REVIEWBY_EXPLICIT /* --reviewby was set on the command-line */
+};
+
 enum resume_type {
 	RESUME_FALSE = 0,
 	RESUME_APPLY,
@@ -134,6 +140,7 @@ struct am_state {
 	int threeway;
 	int quiet;
 	int signoff; /* enum signoff_type */
+	int reviewby; /* enum reviewby_type */
 	int utf8;
 	int keep; /* enum keep_type */
 	int message_id;
@@ -421,6 +428,9 @@ static void am_load(struct am_state *state)
 
 	read_state_file(&sb, state, "sign", 1);
 	state->signoff = !strcmp(sb.buf, "t");
+
+	read_state_file(&sb, state, "review", 1);
+	state->reviewby = !strcmp(sb.buf, "t");
 
 	read_state_file(&sb, state, "utf8", 1);
 	state->utf8 = !strcmp(sb.buf, "t");
@@ -1017,6 +1027,7 @@ static void am_setup(struct am_state *state, enum patch_format patch_format,
 	write_state_bool(state, "threeway", state->threeway);
 	write_state_bool(state, "quiet", state->quiet);
 	write_state_bool(state, "sign", state->signoff);
+	write_state_bool(state, "review", state->reviewby);
 	write_state_bool(state, "utf8", state->utf8);
 
 	if (state->allow_rerere_autoupdate)
@@ -1188,6 +1199,18 @@ static void am_append_signoff(struct am_state *state)
 
 	strbuf_attach(&sb, state->msg, state->msg_len, state->msg_len);
 	append_signoff(&sb, 0, 0);
+	state->msg = strbuf_detach(&sb, &state->msg_len);
+}
+
+/**
+ * Appends reviewby to the "msg" field of the am_state.
+ */
+static void am_append_reviewby(struct am_state *state)
+{
+	struct strbuf sb = STRBUF_INIT;
+
+	strbuf_attach(&sb, state->msg, state->msg_len, state->msg_len);
+	append_reviewby(&sb, 0, 0);
 	state->msg = strbuf_detach(&sb, &state->msg_len);
 }
 
@@ -1849,6 +1872,9 @@ static void am_run(struct am_state *state, int resume)
 			if (state->signoff)
 				am_append_signoff(state);
 
+			if (state->reviewby)
+				am_append_reviewby(state);
+
 			write_author_script(state);
 			write_commit_msg(state);
 		}
@@ -2337,6 +2363,9 @@ int cmd_am(int argc,
 		OPT_SET_INT('s', "signoff", &state.signoff,
 			N_("add a Signed-off-by trailer to the commit message"),
 			SIGNOFF_EXPLICIT),
+		OPT_SET_INT(0, "reviewby", &state.reviewby,
+			N_("add a Reviewed-by trailer to the commit message"),
+			REVIEWBY_EXPLICIT),
 		OPT_BOOL('u', "utf8", &state.utf8,
 			N_("recode into utf8 (default)")),
 		OPT_SET_INT('k', "keep", &state.keep,
@@ -2483,6 +2512,8 @@ int cmd_am(int argc,
 
 		if (state.signoff == SIGNOFF_EXPLICIT)
 			am_append_signoff(&state);
+		if (state.reviewby == REVIEWBY_EXPLICIT)
+			am_append_reviewby(&state);
 	} else {
 		struct strvec paths = STRVEC_INIT;
 		int i;

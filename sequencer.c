@@ -61,6 +61,7 @@
 #define GIT_MAX_LABEL_LENGTH ((NAME_MAX) - (LOCK_SUFFIX_LEN) - 16)
 
 static const char sign_off_header[] = "Signed-off-by: ";
+static const char review_by_header[] = "Reviewed-by: ";
 static const char cherry_picked_prefix[] = "(cherry picked from commit ";
 
 GIT_PATH_FUNC(git_path_commit_editmsg, "COMMIT_EDITMSG")
@@ -199,6 +200,7 @@ static GIT_PATH_FUNC(rebase_path_orig_head, "rebase-merge/orig-head")
 static GIT_PATH_FUNC(rebase_path_verbose, "rebase-merge/verbose")
 static GIT_PATH_FUNC(rebase_path_quiet, "rebase-merge/quiet")
 static GIT_PATH_FUNC(rebase_path_signoff, "rebase-merge/signoff")
+static GIT_PATH_FUNC(rebase_path_reviewby, "rebase-merge/reviewby")
 static GIT_PATH_FUNC(rebase_path_head_name, "rebase-merge/head-name")
 static GIT_PATH_FUNC(rebase_path_onto, "rebase-merge/onto")
 static GIT_PATH_FUNC(rebase_path_autostash, "rebase-merge/autostash")
@@ -1179,6 +1181,10 @@ static int run_git_commit(const char *defmsg,
 		 !opts->signoff && !opts->record_origin &&
 		 !opts->explicit_cleanup)
 		strvec_push(&cmd.args, "--cleanup=verbatim");
+	else if (!(flags & CLEANUP_MSG) &&
+		 !opts->reviewby && !opts->record_origin &&
+		 !opts->explicit_cleanup)
+		strvec_push(&cmd.args, "--cleanup=verbatim");
 
 	if ((flags & ALLOW_EMPTY))
 		strvec_push(&cmd.args, "--allow-empty");
@@ -1628,6 +1634,9 @@ static int try_to_commit(struct repository *r,
 	else if ((opts->signoff || opts->record_origin) &&
 		 !opts->explicit_cleanup)
 		cleanup = COMMIT_MSG_CLEANUP_SPACE;
+	else if ((opts->reviewby || opts->record_origin) &&
+		 !opts->explicit_cleanup)
+		cleanup = COMMIT_MSG_CLEANUP_SPACE;
 	else
 		cleanup = opts->default_msg_cleanup;
 
@@ -2039,6 +2048,8 @@ static int append_squash_message(struct strbuf *buf, const char *body,
 		 */
 		if (opts->signoff)
 			append_signoff(buf, 0, 0);
+		if (opts->reviewby)
+			append_reviewby(buf, 0, 0);
 
 		if ((command == TODO_FIXUP) &&
 		    (flag & TODO_REPLACE_FIXUP_MSG) &&
@@ -2417,6 +2428,9 @@ static int do_pick_commit(struct repository *r,
 
 	if (opts->signoff && !is_fixup(command))
 		append_signoff(&ctx->message, 0, 0);
+
+	if (opts->reviewby && !is_fixup(command))
+		append_reviewby(&ctx->message, 0, 0);
 
 	if (is_rebase_i(opts) && write_author_script(msg.message) < 0)
 		res = -1;
@@ -3079,6 +3093,8 @@ static int populate_opts_cb(const char *key, const char *value,
 			git_config_bool_or_int(key, value, ctx->kvi, &error_flag);
 	else if (!strcmp(key, "options.signoff"))
 		opts->signoff = git_config_bool_or_int(key, value, ctx->kvi, &error_flag);
+	else if (!strcmp(key, "options.reviewby"))
+		opts->reviewby = git_config_bool_or_int(key, value, ctx->kvi, &error_flag);
 	else if (!strcmp(key, "options.record-origin"))
 		opts->record_origin = git_config_bool_or_int(key, value, ctx->kvi, &error_flag);
 	else if (!strcmp(key, "options.allow-ff"))
@@ -3179,6 +3195,10 @@ static int read_populate_opts(struct replay_opts *opts)
 		if (file_exists(rebase_path_signoff())) {
 			opts->allow_ff = 0;
 			opts->signoff = 1;
+		}
+		if (file_exists(rebase_path_reviewby())) {
+			opts->allow_ff = 0;
+			opts->reviewby = 1;
 		}
 
 		if (file_exists(rebase_path_cdate_is_adate())) {
@@ -3286,6 +3306,8 @@ int write_basic_state(struct replay_opts *opts, const char *head_name,
 		write_file(rebase_path_gpg_sign_opt(), "-S%s\n", opts->gpg_sign);
 	if (opts->signoff)
 		write_file(rebase_path_signoff(), "--signoff\n");
+	if (opts->reviewby)
+		write_file(rebase_path_reviewby(), "--reviewby\n");
 	if (opts->drop_redundant_commits)
 		write_file(rebase_path_drop_redundant_commits(), "%s", "");
 	if (opts->keep_redundant_commits)
@@ -3629,6 +3651,9 @@ static int save_opts(struct replay_opts *opts)
 	if (opts->signoff)
 		res |= git_config_set_in_file_gently(opts_file,
 					"options.signoff", NULL, "true");
+	if (opts->reviewby)
+		res |= git_config_set_in_file_gently(opts_file,
+					"options.reviewby", NULL, "true");
 	if (opts->record_origin)
 		res |= git_config_set_in_file_gently(opts_file,
 					"options.record-origin", NULL, "true");
@@ -4949,7 +4974,7 @@ static int pick_commits(struct repository *r,
 
 	ctx->reflog_message = sequencer_reflog_action(opts);
 	if (opts->allow_ff)
-		ASSERT(!(opts->signoff || opts->no_commit ||
+		ASSERT(!(opts->signoff || opts->reviewby || opts->no_commit ||
 			 opts->record_origin || should_edit(opts) ||
 			 opts->committer_date_is_author_date ||
 			 opts->ignore_date));
@@ -5579,6 +5604,66 @@ int sequencer_pick_revisions(struct repository *r,
 out:
 	todo_list_release(&todo_list);
 	return res;
+}
+
+void append_reviewby(struct strbuf *msgbuf, size_t ignore_footer, unsigned flag)
+{
+	unsigned no_dup_rb = flag & APPEND_REVIEWBY_DEDUP;
+	struct strbuf rb = STRBUF_INIT;
+	int has_footer;
+
+	strbuf_addstr(&rb, review_by_header);
+	strbuf_addstr(&rb, fmt_name(WANT_COMMITTER_IDENT));
+	strbuf_addch(&rb, '\n');
+
+	if (!ignore_footer)
+		strbuf_complete_line(msgbuf);
+
+	/*
+	 * If the whole message buffer is equal to the rb, pretend that we
+	 * found a conforming footer with a matching rb
+	 */
+	if (msgbuf->len - ignore_footer == rb.len &&
+	    !strncmp(msgbuf->buf, rb.buf, rb.len))
+		has_footer = 3;
+	else
+		has_footer = has_conforming_footer(msgbuf, &rb, ignore_footer);
+
+	if (!has_footer) {
+		const char *append_newlines = NULL;
+		size_t len = msgbuf->len - ignore_footer;
+
+		if (!len) {
+			/*
+			 * The buffer is completely empty.  Leave foom for
+			 * the title and body to be filled in by the user.
+			 */
+			append_newlines = "\n\n";
+		} else if (len == 1) {
+			/*
+			 * Buffer contains a single newline.  Add another
+			 * so that we leave room for the title and body.
+			 */
+			append_newlines = "\n";
+		} else if (msgbuf->buf[len - 2] != '\n') {
+			/*
+			 * Buffer ends with a single newline.  Add another
+			 * so that there is an empty line between the message
+			 * body and the rb.
+			 */
+			append_newlines = "\n";
+		} /* else, the buffer already ends with two newlines. */
+
+		if (append_newlines)
+			strbuf_splice(msgbuf, msgbuf->len - ignore_footer, 0,
+				append_newlines, strlen(append_newlines));
+	}
+
+	if (has_footer != 3 && (!no_dup_rb || has_footer != 2))
+		strbuf_splice(msgbuf, msgbuf->len - ignore_footer, 0,
+				rb.buf, rb.len);
+
+	strbuf_release(&rb);
 }
 
 void append_signoff(struct strbuf *msgbuf, size_t ignore_footer, unsigned flag)
