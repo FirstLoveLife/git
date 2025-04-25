@@ -44,6 +44,7 @@ struct replay_opts {
 	int record_origin;
 	int no_commit;
 	int signoff;
+	struct strvec trailer_args;
 	int allow_ff;
 	int allow_rerere_auto;
 	int allow_empty;
@@ -86,6 +87,7 @@ struct replay_opts {
 	.action = -1,				\
 	.xopts = STRVEC_INIT,			\
 	.ctx = replay_ctx_new(),		\
+	.trailer_args = STRVEC_INIT, \
 }
 
 /*
