@@ -12,6 +12,7 @@
 #include "setup.h"
 #include "string-list.h"
 #include "strvec.h"
+#include "trailer.h"
 #include "oid-array.h"
 
 /*----- some often used options -----*/
@@ -298,6 +299,28 @@ int parse_opt_passthru_argv(const struct option *opt, const char *arg, int unset
 		return -1;
 
 	strvec_push(opt_value, sb.buf);
+
+	return 0;
+}
+
+int parse_opt_trailer(const struct option *opt, const char *arg, int unset)
+{
+	struct strvec *v = opt->value;
+	struct strbuf sb  = STRBUF_INIT;
+
+	if (unset) {
+		strvec_clear(v);
+		return 0;
+	}
+	if (!arg)
+		return -1;
+
+	if (find_separator(arg, "=:") <= 0)
+		return error(_("malformed --trailer '%s' (missing token or separator)"),
+			     arg);
+
+	strbuf_addf(&sb, "--trailer=%s", arg);
+	strvec_push(v, strbuf_detach(&sb, NULL));
 
 	return 0;
 }

@@ -3,6 +3,7 @@
 
 #include "list.h"
 #include "strbuf.h"
+#include <stddef.h>
 
 struct trailer_block;
 struct strvec;
@@ -202,4 +203,16 @@ void trailer_iterator_release(struct trailer_iterator *iter);
  */
 int amend_file_with_trailers(const char *path, const struct strvec *trailer_args);
 
+/*
+ * If the given line is of the form
+ * "<token><optional whitespace><separator>..." or "<separator>...", return the
+ * location of the separator. Otherwise, return -1.  The optional whitespace
+ * is allowed there primarily to allow things like "Bug #43" where <token> is
+ * "Bug" and <separator> is "#".
+ *
+ * The separator-starts-line case (in which this function returns 0) is
+ * distinguished from the non-well-formed-line case (in which this function
+ * returns -1) because some callers of this function need such a distinction.
+ */
+ssize_t find_separator(const char *line, const char *separators);
 #endif /* TRAILER_H */

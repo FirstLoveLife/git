@@ -529,6 +529,7 @@ int parse_opt_strvec(const struct option *, const char *, int);
 int parse_opt_noop_cb(const struct option *, const char *, int);
 int parse_opt_passthru(const struct option *, const char *, int);
 int parse_opt_passthru_argv(const struct option *, const char *, int);
+int parse_opt_trailer(const struct option *opt, const char *arg, int unset);
 /* value is enum branch_track* */
 int parse_opt_tracking_mode(const struct option *, const char *, int);
 
@@ -597,6 +598,16 @@ int parse_opt_tracking_mode(const struct option *, const char *, int);
 	.help = (h), \
 	.flags = (f), \
 	.callback = parse_opt_passthru_argv, \
+}
+#define OPT_TRAILER_ARGV(s, l, v, a, h, f) { \
+	.type = OPTION_CALLBACK, \
+	.short_name = (s), \
+	.long_name = (l), \
+	.value = (v), \
+	.argh = (a), \
+	.help = (h), \
+	.flags = (f), \
+	.callback = parse_opt_trailer, \
 }
 #define _OPT_CONTAINS_OR_WITH(l, v, h, f) { \
 	.type = OPTION_CALLBACK, \

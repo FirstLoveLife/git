@@ -616,18 +616,7 @@ static int token_matches_item(const char *tok, struct arg_item *item, size_t tok
 	return item->conf.key ? !strncasecmp(tok, item->conf.key, tok_len) : 0;
 }
 
-/*
- * If the given line is of the form
- * "<token><optional whitespace><separator>..." or "<separator>...", return the
- * location of the separator. Otherwise, return -1.  The optional whitespace
- * is allowed there primarily to allow things like "Bug #43" where <token> is
- * "Bug" and <separator> is "#".
- *
- * The separator-starts-line case (in which this function returns 0) is
- * distinguished from the non-well-formed-line case (in which this function
- * returns -1) because some callers of this function need such a distinction.
- */
-static ssize_t find_separator(const char *line, const char *separators)
+ssize_t find_separator(const char *line, const char *separators)
 {
 	int whitespace_found = 0;
 	const char *c;

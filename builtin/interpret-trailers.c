@@ -71,6 +71,11 @@ static int option_parse_trailer(const struct option *opt,
 	if (!arg)
 		return -1;
 
+	// TODO: ./t7513-interpret-trailers.sh would have many failed cases
+	if (find_separator(arg, "=:") <= 0)
+		return error(_("malformed --trailer '%s' (missing token or separator)"),
+			     arg);
+
 	item = xmalloc(sizeof(*item));
 	item->text = arg;
 	item->where = where;
