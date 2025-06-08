@@ -202,4 +202,21 @@ void trailer_iterator_release(struct trailer_iterator *iter);
  */
 int amend_file_with_trailers(const char *path, const struct strvec *trailer_args);
 
+/*
+ * In‑memory variant of amend_file_with_trailers(): instead of rewriting a file
+ * on disk (and therefore spawning a separate `git interpret‑trailers` process)
+ * we operate directly on a struct strbuf that already contains the commit
+ * message.  The rules for positioning, deduplication, and formatting are the
+ * same as those implemented by the builtin `interpret‑trailers` command.
+ *
+ *  - @buf          : the message to be amended.  On success, its contents are
+ *                    replaced with the new message that has the trailers
+ *                    inserted.
+ *  - @trailer_args : the list of trailer strings exactly as would be passed on
+ *                    the command‑line via repeated `--trailer` options.
+ *
+ * Returns 0 on success, <0 on error.
+ */
+int amend_strbuf_with_trailers(struct strbuf *buf,
+                               const struct strvec *trailer_args);
 #endif /* TRAILER_H */
