@@ -1224,14 +1224,138 @@ void trailer_iterator_release(struct trailer_iterator *iter)
 	strbuf_release(&iter->key);
 }
 
-int amend_file_with_trailers(const char *path, const struct strvec *trailer_args)
+static size_t first_comment_pos(const struct strbuf *buf)
 {
-	struct child_process run_trailer = CHILD_PROCESS_INIT;
+    const char *p = buf->buf;
+    const char *end = buf->buf + buf->len;
 
-	run_trailer.git_cmd = 1;
-	strvec_pushl(&run_trailer.args, "interpret-trailers",
-		     "--in-place", "--no-divider",
-		     path, NULL);
-	strvec_pushv(&run_trailer.args, trailer_args->v);
-	return run_command(&run_trailer);
+    while (p < end) {
+        const char *line = p;
+        const char *nl = memchr(p, '\n', end - p);
+        size_t len = nl ? (size_t)(nl - p) : (size_t)(end - p);
+
+        /* skip leading whitespace */
+        size_t i = 0;
+        while (i < len && isspace((unsigned char)line[i]))
+            i++;
+
+        if (i < len && line[i] == '#')
+            return (size_t)(line - buf->buf); /* comment starts here */
+
+        if (!nl)              /* last line without newline */
+            break;
+        p = nl + 1;
+    }
+    return buf->len;          /* no comment line found */
+}
+
+int amend_strbuf_with_trailers(struct strbuf *buf,
+                               const struct strvec *trailer_args)
+{
+    struct process_trailer_options opts = PROCESS_TRAILER_OPTIONS_INIT;
+
+    LIST_HEAD(orig_head);   /* existing trailers, if any          */
+    LIST_HEAD(cfg_head);    /* config trailers                    */
+    LIST_HEAD(cli_raw);     /* new_trailer_item from CLI          */
+    LIST_HEAD(cli_head);    /* arg_item after helper              */
+    LIST_HEAD(all_new);     /* merged list                        */
+
+    struct strbuf trailers_sb = STRBUF_INIT;
+    struct strbuf out         = STRBUF_INIT;
+    struct trailer_block *blk;
+    size_t i;
+
+    /* 1. parse message ------------------------------------------------- */
+    blk = parse_trailers(&opts, buf->buf, &orig_head);
+    bool had_trailer_before = !list_empty(&orig_head);
+
+    /* 2. CLI trailers -------------------------------------------------- */
+    if (trailer_args && trailer_args->nr) {
+        for (i = 0; i < trailer_args->nr; i++) {
+            const char *arg  = trailer_args->v[i];
+            const char *text;
+            if (!skip_prefix(arg, "--trailer=", &text))
+                text = arg;
+
+            if (!*text)
+                continue;
+
+            struct new_trailer_item *ni = xcalloc(1, sizeof(*ni));
+            INIT_LIST_HEAD(&ni->list);
+            ni->text = xstrdup(text);
+            list_add_tail(&ni->list, &cli_raw);
+        }
+        parse_trailers_from_command_line_args(&cli_head, &cli_raw);
+    }
+
+    /* 3. config trailers ---------------------------------------------- */
+    parse_trailers_from_config(&cfg_head);
+
+    /* 4. merge lists --------------------------------------------------- */
+    list_splice(&cli_head, &all_new);
+    list_splice(&cfg_head, &all_new);
+
+    /* 5. apply --------------------------------------------------------- */
+    process_trailers_lists(&orig_head, &all_new);
+
+    /* 6. format updated trailer block --------------------------------- */
+    format_trailers(&opts, &orig_head, &trailers_sb);
+
+    /* 7. decide insertion point --------------------------------------- */
+    if (had_trailer_before) {
+        /* insert at existing trailer block */
+        strbuf_add(&out, buf->buf, trailer_block_start(blk));
+        if (!blank_line_before_trailer_block(blk))
+            strbuf_addch(&out, '\n');
+        strbuf_addbuf(&out, &trailers_sb);
+        strbuf_add(&out,
+                   buf->buf + trailer_block_end(blk),
+                   buf->len - trailer_block_end(blk));
+    } else {
+        /* insert before first comment (git --verbose) if any */
+        size_t cpos = first_comment_pos(buf);
+
+        /* copy body up to comment (or whole buf if none) */
+        strbuf_add(&out, buf->buf, cpos);
+
+        /* ensure single blank line separating body & trailers */
+        if (!out.len || out.buf[out.len - 1] != '\n')
+            strbuf_addch(&out, '\n');
+        if (out.len >= 2 && out.buf[out.len - 2] != '\n')
+            strbuf_addch(&out, '\n');
+
+        strbuf_addbuf(&out, &trailers_sb);
+
+        /* copy remaining comment lines (if any) */
+        strbuf_add(&out, buf->buf + cpos, buf->len - cpos);
+    }
+
+    strbuf_swap(buf, &out);
+
+    /* 8. cleanup ------------------------------------------------------- */
+    strbuf_release(&out);
+    strbuf_release(&trailers_sb);
+    free_trailers(&orig_head);
+    trailer_block_release(blk);
+    return 0;
+}
+
+int amend_file_with_trailers(const char *path,
+                             const struct strvec *trailer_args)
+{
+    struct strbuf buf = STRBUF_INIT;
+
+    if (!trailer_args || !trailer_args->nr)
+        return 0;
+
+    if (strbuf_read_file(&buf, path, 0) < 0)
+        return error_errno("could not read '%s'", path);
+
+    if (amend_strbuf_with_trailers(&buf, trailer_args))
+        die("failed to append trailers");
+
+    /* `write_file_buf()` aborts on error internally */
+    write_file_buf(path, buf.buf, buf.len);
+    strbuf_release(&buf);
+    return 0;
 }
