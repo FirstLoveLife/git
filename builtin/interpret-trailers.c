@@ -104,6 +104,30 @@ static void read_input_file(struct strbuf *sb, const char *file)
 	strbuf_complete_line(sb);
 }
 
+static void interpret_trailers(const struct process_trailer_options *opts,
+			       struct list_head *new_trailer_head,
+			       const char *file)
+{
+	struct strbuf in_buf = STRBUF_INIT;
+	struct strbuf out_buf = STRBUF_INIT;
+
+	read_input_file(&in_buf, file);
+	if (trailer_process(opts, in_buf.buf, new_trailer_head, &out_buf) < 0) {
+		if (file)
+			die(_("failed to process trailers for %s"), file);
+		else
+			die(_("failed to process trailers"));
+	}
+
+	if (opts->in_place)
+		write_file_buf(file, out_buf.buf, out_buf.len);
+	else
+		fwrite(out_buf.buf, 1, out_buf.len, stdout);
+
+	strbuf_release(&in_buf);
+	strbuf_release(&out_buf);
+}
+
 int cmd_interpret_trailers(int argc,
 			   const char **argv,
 			   const char *prefix,
@@ -149,33 +173,13 @@ int cmd_interpret_trailers(int argc,
 
 	if (argc) {
 		int i;
-		for (i = 0; i < argc; i++) {
-			struct strbuf in_buf = STRBUF_INIT;
-			struct strbuf out_buf = STRBUF_INIT;
-
-			read_input_file(&in_buf, argv[i]);
-			if (trailer_process(&opts, in_buf.buf, &trailers, &out_buf) < 0)
-				die(_("failed to process trailers for %s"), argv[i]);
-			if (opts.in_place)
-				write_file_buf(argv[i], out_buf.buf, out_buf.len);
-			else
-				fwrite(out_buf.buf, 1, out_buf.len, stdout);
-			strbuf_release(&in_buf);
-			strbuf_release(&out_buf);
-		}
+		for (i = 0; i < argc; i++)
+			interpret_trailers(&opts, &trailers, argv[i]);
 	} else {
-		struct strbuf in_buf = STRBUF_INIT;
-		struct strbuf out_buf = STRBUF_INIT;
-
 		if (opts.in_place)
 			die(_("no input file given for in-place editing"));
 
-		read_input_file(&in_buf, NULL);
-		if (trailer_process(&opts, in_buf.buf, &trailers, &out_buf) < 0)
-			die(_("failed to process trailers"));
-		fwrite(out_buf.buf, 1, out_buf.len, stdout);
-		strbuf_release(&in_buf);
-		strbuf_release(&out_buf);
+		interpret_trailers(&opts, &trailers, NULL);
 	}
 
 	new_trailers_clear(&trailers);
