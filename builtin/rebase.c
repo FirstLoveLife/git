@@ -442,8 +442,6 @@ static int read_basic_state(struct rebase_options *opts)
 	struct strbuf head_name = STRBUF_INIT;
 	struct strbuf buf = STRBUF_INIT;
 	struct object_id oid;
-	const char trailer_state_name[] = "trailer";
-	const char *path = state_dir_path(trailer_state_name, opts);
 
 	if (!read_oneliner(&head_name, state_dir_path("head-name", opts),
 			   READ_ONELINER_WARN_MISSING) ||
@@ -512,7 +510,7 @@ static int read_basic_state(struct rebase_options *opts)
 
 	strbuf_release(&buf);
 
-	if (strbuf_read_file(&buf, path, 0) >= 0) {
+	if (strbuf_read_file(&buf, state_dir_path("trailer", opts), 0) >= 0) {
 		const char *p = buf.buf, *end = buf.buf + buf.len;
 
 		while (p < end) {
@@ -535,8 +533,6 @@ static int read_basic_state(struct rebase_options *opts)
 
 static int rebase_write_basic_state(struct rebase_options *opts)
 {
-	const char trailer_state_name[] = "trailer";
-
 	write_file(state_dir_path("head-name", opts), "%s",
 		   opts->head_name ? opts->head_name : "detached HEAD");
 	write_file(state_dir_path("onto", opts), "%s",
@@ -568,7 +564,7 @@ static int rebase_write_basic_state(struct rebase_options *opts)
 				strbuf_addstr(&buf, opts->trailer_args.v[i]);
 				strbuf_addch(&buf, '\n');
 		}
-		write_file(state_dir_path(trailer_state_name, opts),
+		write_file(state_dir_path("trailer", opts),
 				   "%s", buf.buf);
 		strbuf_release(&buf);
 	}
