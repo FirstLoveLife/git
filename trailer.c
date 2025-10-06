@@ -1266,7 +1266,7 @@ int trailer_process(const struct process_trailer_options *opts,
 	struct trailer_block *blk;
 	LIST_HEAD(orig_head);
 	struct strbuf trailers_sb = STRBUF_INIT;
-	int had_trailer_before;
+	bool had_trailer_before;
 
 	blk = parse_trailers(opts, msg, &orig_head);
 	had_trailer_before = !list_empty(&orig_head);
