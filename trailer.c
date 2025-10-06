@@ -1235,12 +1235,9 @@ static int amend_strbuf_with_trailers(struct strbuf *buf,
 	opts.no_divider = 1;
 
 	for (i = 0; i < trailer_args->nr; i++) {
-		const char *arg = trailer_args->v[i];
-		const char *text;
+		const char *text = trailer_args->v[i];
 		struct new_trailer_item *item;
 
-		if (!skip_prefix(arg, "--trailer=", &text))
-			text = arg;
 		if (!*text)
 			continue;
 		item = xcalloc(1, sizeof(*item));
