@@ -508,7 +508,7 @@ static int read_basic_state(struct rebase_options *opts)
 		opts->gpg_sign_opt = xstrdup(buf.buf);
 	}
 
-	strbuf_release(&buf);
+	strbuf_reset(&buf);
 
 	if (strbuf_read_file(&buf, state_dir_path("trailer", opts), 0) >= 0) {
 		const char *p = buf.buf, *end = buf.buf + buf.len;
