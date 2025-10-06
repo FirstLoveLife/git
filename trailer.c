@@ -1265,14 +1265,15 @@ int trailer_process(const struct process_trailer_options *opts,
 {
 	struct trailer_block *blk;
 	LIST_HEAD(orig_head);
-	LIST_HEAD(config_head);
-	LIST_HEAD(arg_head);
 	struct strbuf trailers_sb = STRBUF_INIT;
 	int had_trailer_before;
 
 	blk = parse_trailers(opts, msg, &orig_head);
 	had_trailer_before = !list_empty(&orig_head);
 	if (!opts->only_input) {
+		LIST_HEAD(config_head);
+		LIST_HEAD(arg_head);
+
 		parse_trailers_from_config(&config_head);
 		parse_trailers_from_command_line_args(&arg_head, new_trailer_head);
 		list_splice(&config_head, &arg_head);
