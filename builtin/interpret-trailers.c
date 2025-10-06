@@ -122,7 +122,7 @@ static void interpret_trailers(const struct process_trailer_options *opts,
 	if (opts->in_place)
 		write_file_buf(file, out_buf.buf, out_buf.len);
 	else
-		fwrite(out_buf.buf, 1, out_buf.len, stdout);
+		strbuf_write(&out_buf, stdout);
 
 	strbuf_release(&in_buf);
 	strbuf_release(&out_buf);
