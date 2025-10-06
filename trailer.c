@@ -1266,10 +1266,8 @@ int trailer_process(const struct process_trailer_options *opts,
 	struct trailer_block *blk;
 	LIST_HEAD(orig_head);
 	struct strbuf trailers_sb = STRBUF_INIT;
-	bool had_trailer_before;
 
 	blk = parse_trailers(opts, msg, &orig_head);
-	had_trailer_before = !list_empty(&orig_head);
 	if (!opts->only_input) {
 		LIST_HEAD(config_head);
 		LIST_HEAD(arg_head);
@@ -1280,40 +1278,18 @@ int trailer_process(const struct process_trailer_options *opts,
 		process_trailers_lists(&orig_head, &arg_head);
 	}
 	format_trailers(opts, &orig_head, &trailers_sb);
-	if (!opts->only_trailers && !opts->only_input && !opts->unfold &&
-	    !opts->trim_empty && list_empty(&orig_head) &&
-	    (list_empty(new_trailer_head) || opts->only_input)) {
-		size_t split = trailer_block_start(blk); /* end-of-log-msg */
-		if (!blank_line_before_trailer_block(blk)) {
-			strbuf_add(out, msg, split);
-			strbuf_addch(out, '\n');
-			strbuf_addstr(out, msg + split);
-		} else
-			strbuf_addstr(out, msg);
-
-		strbuf_release(&trailers_sb);
-		trailer_block_release(blk);
-		return 0;
-	}
 	if (opts->only_trailers) {
 		strbuf_addbuf(out, &trailers_sb);
-	} else if (had_trailer_before) {
-		strbuf_add(out, msg, trailer_block_start(blk));
-		if (!blank_line_before_trailer_block(blk))
-			strbuf_addch(out, '\n');
-		strbuf_addbuf(out, &trailers_sb);
-		strbuf_add(out, msg + trailer_block_end(blk),
-			   strlen(msg) - trailer_block_end(blk));
 	} else {
-		size_t cpos = trailer_block_start(blk);
-		strbuf_add(out, msg, cpos);
-		if (cpos == 0) /* empty body → just one \n */
-			strbuf_addch(out, '\n');
-		else if (!blank_line_before_trailer_block(blk))
-			strbuf_addch(out, '\n'); /* body without trailing blank */
+		size_t block_start = trailer_block_start(blk);
+		size_t block_end = trailer_block_end(blk);
+		bool need_blank_line = !blank_line_before_trailer_block(blk);
 
+		strbuf_add(out, msg, block_start);
+		if (need_blank_line)
+			strbuf_addch(out, '\n');
 		strbuf_addbuf(out, &trailers_sb);
-		strbuf_add(out, msg + cpos, strlen(msg) - cpos);
+		strbuf_add(out, msg + block_end, strlen(msg) - block_end);
 	}
 	strbuf_release(&trailers_sb);
 	free_trailers(&orig_head);
