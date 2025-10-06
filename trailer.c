@@ -9,6 +9,7 @@
 #include "commit.h"
 #include "trailer.h"
 #include "list.h"
+#include "wrapper.h"
 /*
  * Copyright (c) 2013, 2014 Christian Couder <chriscool@tuxfamily.org>
  */
@@ -1308,11 +1309,16 @@ int amend_file_with_trailers(const char *path,
 	if (strbuf_read_file(&buf, path, 0) < 0)
 		return error_errno("could not read '%s'", path);
 
-	if (amend_strbuf_with_trailers(&buf, trailer_args))
-		die("failed to append trailers");
+	if (amend_strbuf_with_trailers(&buf, trailer_args)) {
+		strbuf_release(&buf);
+		return error("failed to append trailers");
+	}
 
-	/* `write_file_buf()` aborts on error internally */
-	write_file_buf(path, buf.buf, buf.len);
+	if (write_file_buf_gently(path, buf.buf, buf.len)) {
+		strbuf_release(&buf);
+		return -1;
+	}
+
 	strbuf_release(&buf);
 	return 0;
 }
