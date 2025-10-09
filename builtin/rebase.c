@@ -1124,24 +1124,6 @@ static int check_exec_cmd(const char *cmd)
 	return 0;
 }
 
-static void validate_trailer_args_after_config(const struct strvec *cli_args)
-{
-	for (size_t i = 0; i < cli_args->nr; i++) {
-		const char *txt = cli_args->v[i]; // Key[:=]Val
-		const char *sep;
-
-		if (!*txt)
-			die(_("empty --trailer argument"));
-
-		sep = strpbrk(txt, ":=");
-
-		/* there must be key bfore seperator */
-		if (sep && sep == txt)
-			die(_("invalid trailer '%s': missing key before separator"),
-			    txt);
-	}
-}
-
 int cmd_rebase(int argc,
 	       const char **argv,
 	       const char *prefix,

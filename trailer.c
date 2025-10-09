@@ -7,6 +7,7 @@
 #include "string-list.h"
 #include "run-command.h"
 #include "commit.h"
+#include "strvec.h"
 #include "trailer.h"
 #include "list.h"
 #include "wrapper.h"
@@ -768,6 +769,30 @@ void parse_trailers_from_command_line_args(struct list_head *arg_head,
 				     strbuf_detach(&val, NULL),
 				     conf, tr);
 		}
+	}
+
+	free(cl_separators);
+}
+
+void validate_trailer_args_after_config(const struct strvec *cli_args)
+{
+	char *cl_separators;
+
+	trailer_config_init();
+
+	cl_separators = xstrfmt("=%s", separators);
+
+	for (size_t i = 0; i < cli_args->nr; i++) {
+		const char *txt = cli_args->v[i];
+		ssize_t separator_pos;
+
+		if (!*txt)
+			die(_("empty --trailer argument"));
+
+		separator_pos = find_separator(txt, cl_separators);
+		if (separator_pos == 0)
+			die(_("invalid trailer '%s': missing key before separator"),
+		    txt);
 	}
 
 	free(cl_separators);
