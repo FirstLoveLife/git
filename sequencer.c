@@ -2444,6 +2444,14 @@ static int do_pick_commit(struct repository *r,
 	if (opts->signoff && !is_fixup(command))
 		append_signoff(&ctx->message, 0, 0);
 
+	if (opts->trailer_args.nr && !is_fixup(command)) {
+		if (amend_strbuf_with_trailers(&ctx->message,
+					       &opts->trailer_args)) {
+			res = error(_("unable to add trailers to commit message"));
+			goto leave;
+		}
+	}
+
 	if (is_rebase_i(opts) && write_author_script(msg.message) < 0)
 		res = -1;
 	else if (!opts->strategy ||
@@ -2518,17 +2526,6 @@ static int do_pick_commit(struct repository *r,
 			_("dropping %s %s -- patch contents already upstream\n"),
 			oid_to_hex(&commit->object.oid), msg.subject);
 	} /* else allow == 0 and there's nothing special to do */
-
-	if (!res && opts->trailer_args.nr && !drop_commit) {
-		const char *trailer_file =
-			msg_file ? msg_file : git_path_merge_msg(r);
-
-		if (amend_file_with_trailers(trailer_file,
-						&opts->trailer_args)) {
-			res = error(_("unable to add trailers to commit message"));
-			goto leave;
-		}
-	}
 
 	if (!opts->no_commit && !drop_commit) {
 		if (author || command == TODO_REVERT || (flags & AMEND_MSG))

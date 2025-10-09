@@ -1250,8 +1250,8 @@ void trailer_iterator_release(struct trailer_iterator *iter)
 	strbuf_release(&iter->key);
 }
 
-static int amend_strbuf_with_trailers(struct strbuf *buf,
-									  const struct strvec *trailer_args)
+int amend_strbuf_with_trailers(struct strbuf *buf,
+			       const struct strvec *trailer_args)
 {
 	struct process_trailer_options opts = PROCESS_TRAILER_OPTIONS_INIT;
 	LIST_HEAD(new_trailer_head);

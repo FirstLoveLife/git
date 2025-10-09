@@ -197,6 +197,9 @@ int trailer_iterator_advance(struct trailer_iterator *iter);
  */
 void trailer_iterator_release(struct trailer_iterator *iter);
 
+int amend_strbuf_with_trailers(struct strbuf *buf,
+			       const struct strvec *trailer_args);
+
 /*
  * Augment a file to add trailers to it (similar to 'git interpret-trailers').
  * Returns 0 on success or a non-zero error code on failure.
