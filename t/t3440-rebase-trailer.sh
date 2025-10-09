@@ -34,7 +34,7 @@ test_expect_success 'apply backend is rejected with --trailer' '
 	test_expect_code 128 \
 	git rebase --apply --trailer "Reviewed-by: Dev <dev@example.com>" \
 				HEAD^ 2>err &&
-	test_grep "requires the merge backend" err &&
+	test_grep "fatal: --trailer requires the merge backend" err &&
 	test_cmp_rev HEAD $head_before
 '
 
