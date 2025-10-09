@@ -1124,29 +1124,22 @@ static int check_exec_cmd(const char *cmd)
 	return 0;
 }
 
-static int validate_trailer_args_after_config(const struct strvec *cli_args,
-					      struct strbuf *err)
+static void validate_trailer_args_after_config(const struct strvec *cli_args)
 {
 	for (size_t i = 0; i < cli_args->nr; i++) {
 		const char *txt = cli_args->v[i]; // Key[:=]Val
 		const char *sep;
 
-		if (!*txt) {
-			strbuf_addstr(err, _("empty --trailer argument"));
-			return -1;
-		}
+		if (!*txt)
+			die(_("empty --trailer argument"));
 
 		sep = strpbrk(txt, ":=");
 
 		/* there must be key bfore seperator */
-		if (sep && sep == txt) {
-			strbuf_addf(err,
-				    _("invalid trailer '%s': missing key before separator"),
-				    txt);
-			return -1;
-		}
+		if (sep && sep == txt)
+			die(_("invalid trailer '%s': missing key before separator"),
+			    txt);
 	}
-	return 0;
 }
 
 int cmd_rebase(int argc,
@@ -1353,13 +1346,8 @@ int cmd_rebase(int argc,
 			     builtin_rebase_usage, 0);
 
 	if (options.trailer_args.nr) {
-		struct strbuf err = STRBUF_INIT;
-
-		if (validate_trailer_args_after_config(&options.trailer_args, &err))
-			die("%s", err.buf);
-
+		validate_trailer_args_after_config(&options.trailer_args);
 		options.flags |= REBASE_FORCE;
-		strbuf_release(&err);
 	}
 
 	if (preserve_merges_selected)
