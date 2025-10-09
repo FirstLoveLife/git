@@ -1128,12 +1128,8 @@ static int validate_trailer_args_after_config(const struct strvec *cli_args,
 					      struct strbuf *err)
 {
 	for (size_t i = 0; i < cli_args->nr; i++) {
-		const char *raw = cli_args->v[i];
-		const char *txt; // Key[:=]Val
+		const char *txt = cli_args->v[i]; // Key[:=]Val
 		const char *sep;
-
-		if (!skip_prefix(raw, "--trailer=", &txt))
-			txt = raw;
 
 		if (!*txt) {
 			strbuf_addstr(err, _("empty --trailer argument"));
