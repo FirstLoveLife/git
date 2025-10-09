@@ -39,21 +39,18 @@ test_expect_success 'apply backend is rejected with --trailer' '
 '
 
 test_expect_success 'reject empty --trailer argument' '
-	git reset --hard third &&
 	test_expect_code 128 git rebase -m --trailer "" HEAD^ 2>err &&
 	test_grep "empty --trailer" err
 '
 
 test_expect_success 'reject trailer with missing key before separator' '
-	git reset --hard third &&
 	test_expect_code 128 git rebase -m --trailer ": no-key" HEAD^ 2>err &&
 	test_grep "missing key before separator" err
 '
 
 test_expect_success 'CLI trailer duplicates allowed; replace policy keeps last' '
-	git reset --hard third &&
 	git -c trailer.Bug.ifexists=replace -c trailer.Bug.ifmissing=add \
-		rebase -m --trailer "Bug: 123" --trailer "Bug: 456" HEAD~1 &&
+		rebase -m --trailer "Bug: 123" --trailer "Bug: 456" HEAD~1 third &&
 	cat >expect <<-\EOF &&
 	third
 
@@ -63,10 +60,9 @@ test_expect_success 'CLI trailer duplicates allowed; replace policy keeps last' 
 '
 
 test_expect_success 'multiple Signed-off-by trailers all preserved' '
-	git reset --hard third &&
 	git rebase -m \
 			--trailer "Signed-off-by: Dev A <a@ex.com>" \
-			--trailer "Signed-off-by: Dev B <b@ex.com>" HEAD~1 &&
+			--trailer "Signed-off-by: Dev B <b@ex.com>" HEAD~1 third &&
 	cat >expect <<-\EOF &&
 	third
 
@@ -78,7 +74,6 @@ test_expect_success 'multiple Signed-off-by trailers all preserved' '
 
 test_expect_success 'rebase -m --trailer adds trailer after conflicts' '
 	create_expect file2-signed "file-2" &&
-	git reset --hard third &&
 	test_must_fail git rebase -m \
 		--trailer "Reviewed-by: Dev <dev@example.com>" \
 		second third &&
