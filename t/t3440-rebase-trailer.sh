@@ -52,18 +52,28 @@ test_expect_success 'reject trailer with missing key before separator' '
 
 test_expect_success 'CLI trailer duplicates allowed; replace policy keeps last' '
 	git reset --hard third &&
-	git -c trailer.Bug.ifexists=replace -c trailer.Bug.ifmissing=add rebase -m --trailer "Bug: 123" --trailer "Bug: 456" HEAD~1 &&
-	git cat-file commit HEAD | grep "^Bug: 456" &&
-	git cat-file commit HEAD | grep -v "^Bug: 123"
+	git -c trailer.Bug.ifexists=replace -c trailer.Bug.ifmissing=add \
+		rebase -m --trailer "Bug: 123" --trailer "Bug: 456" HEAD~1 &&
+	cat >expect <<-\EOF &&
+	third
+
+	Bug: 456
+	EOF
+	test_commit_message HEAD expect
 '
 
 test_expect_success 'multiple Signed-off-by trailers all preserved' '
 	git reset --hard third &&
 	git rebase -m \
-		--trailer "Signed-off-by: Dev A <a@ex.com>" \
-		--trailer "Signed-off-by: Dev B <b@ex.com>" HEAD~1 &&
-	git cat-file commit HEAD | grep -c "^Signed-off-by:" >count &&
-	test "$(cat count)" = 2   # two new commits
+			--trailer "Signed-off-by: Dev A <a@ex.com>" \
+			--trailer "Signed-off-by: Dev B <b@ex.com>" HEAD~1 &&
+	cat >expect <<-\EOF &&
+	third
+
+	Signed-off-by: Dev A <a@ex.com>
+	Signed-off-by: Dev B <b@ex.com>
+	EOF
+	test_commit_message HEAD expect
 '
 
 test_expect_success 'rebase -m --trailer adds trailer after conflicts' '
