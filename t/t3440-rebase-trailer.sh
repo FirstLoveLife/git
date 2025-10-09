@@ -26,14 +26,7 @@ test_expect_success 'setup repo with a small history' '
 	git checkout -b conflict-branch first &&
 	test_commit file-2 file-2 &&
 	test_commit conflict file &&
-	test_commit third file &&
-	ident="$GIT_COMMITTER_NAME <$GIT_COMMITTER_EMAIL>" &&
-	create_expect initial-signed  "Initial empty commit" &&
-	create_expect first-signed    "first"                 &&
-	create_expect second-signed   "second"                &&
-	create_expect file2-signed    "file-2"                &&
-	create_expect third-signed    "third"                 &&
-	create_expect conflict-signed "conflict"
+	test_commit third file
 '
 
 test_expect_success 'apply backend is rejected with --trailer' '
@@ -74,6 +67,7 @@ test_expect_success 'multiple Signed-off-by trailers all preserved' '
 '
 
 test_expect_success 'rebase -m --trailer adds trailer after conflicts' '
+	create_expect file2-signed "file-2" &&
 	git reset --hard third &&
 	test_must_fail git rebase -m \
 		--trailer "Reviewed-by: Dev <dev@example.com>" \
@@ -85,6 +79,8 @@ test_expect_success 'rebase -m --trailer adds trailer after conflicts' '
 '
 
 test_expect_success 'rebase --root --trailer updates every commit' '
+	create_expect initial-signed "Initial empty commit" &&
+	create_expect first-signed "first" &&
 	git checkout first &&
 	git rebase --root --keep-empty \
 		--trailer "Reviewed-by: Dev <dev@example.com>" &&
