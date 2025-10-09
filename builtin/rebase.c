@@ -524,7 +524,6 @@ static int read_basic_state(struct rebase_options *opts)
 
 			p = nl + 1;
 		}
-		strbuf_release(&buf);
 	}
 	strbuf_release(&buf);
 
