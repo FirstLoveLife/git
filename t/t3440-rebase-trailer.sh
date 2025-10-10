@@ -73,14 +73,14 @@ test_expect_success 'multiple Signed-off-by trailers all preserved' '
 '
 
 test_expect_success 'rebase -m --trailer adds trailer after conflicts' '
-	create_expect file2-signed "file-2" &&
+	create_expect third-signed "third" &&
 	test_must_fail git rebase -m \
 		--trailer "Reviewed-by: Dev <dev@example.com>" \
 		second third &&
 	git checkout --theirs file &&
 	git add file &&
 	git rebase --continue &&
-	test_commit_message HEAD~2 file2-signed
+	test_commit_message HEAD third-signed
 '
 
 test_expect_success 'rebase --root --trailer updates every commit' '
