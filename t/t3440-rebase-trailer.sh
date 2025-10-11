@@ -50,6 +50,16 @@ test_expect_success 'reject trailer with missing key before separator' '
 	test_grep "missing key before separator" err
 '
 
+test_expect_success 'allow trailer with missing value after separator' '
+	git rebase -m --trailer "Acked-by:" HEAD~1 third &&
+	cat >expect <<-\EOF &&
+	third
+
+	Acked-by: 
+	EOF
+	test_commit_message HEAD expect
+'
+
 test_expect_success 'CLI trailer duplicates allowed; replace policy keeps last' '
 	git -c trailer.Bug.ifexists=replace -c trailer.Bug.ifmissing=add \
 		rebase -m --trailer "Bug: 123" --trailer "Bug: 456" HEAD~1 third &&
