@@ -99,8 +99,8 @@ test_expect_success 'rebase -m --trailer adds trailer after conflicts' '
 
 test_expect_success 'rebase --root --trailer updates every commit' '
 	git checkout first &&
-	git rebase --root \
-		--trailer "$REVIEWED_BY_TRAILER" &&
+	git -c trailer.review.key=Reviewed-by rebase --root \
+		--trailer=review="Dev <dev@example.com>" &&
 	expect_trailer_msg HEAD  "first" &&
 	expect_trailer_msg HEAD^ "Initial empty commit"
 '
