@@ -11,11 +11,13 @@ export GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME
 . ./test-lib.sh
 . "$TEST_DIRECTORY"/lib-rebase.sh # test_commit_message, helpers
 
-create_expect() {
-	cat >"$1" <<-EOF
+REVIEWED_BY_TRAILER="Reviewed-by: Dev <dev@example.com>"
+
+expect_trailer_msg() {
+	test_commit_message "$1" <<-EOF
 	$2
 
-	Reviewed-by: Dev <dev@example.com>
+	${3:-$REVIEWED_BY_TRAILER}
 	EOF
 }
 
@@ -32,7 +34,7 @@ test_expect_success 'setup repo with a small history' '
 test_expect_success 'apply backend is rejected with --trailer' '
 	head_before=$(git rev-parse HEAD) &&
 	test_expect_code 128 \
-	git rebase --apply --trailer "Reviewed-by: Dev <dev@example.com>" \
+	git rebase --apply --trailer "$REVIEWED_BY_TRAILER" \
 				HEAD^ 2>err &&
 	test_grep "fatal: --trailer requires the merge backend" err &&
 	test_cmp_rev HEAD $head_before
@@ -73,23 +75,20 @@ test_expect_success 'multiple Signed-off-by trailers all preserved' '
 '
 
 test_expect_success 'rebase -m --trailer adds trailer after conflicts' '
-	create_expect third-signed "third" &&
 	test_must_fail git rebase -m \
-		--trailer "Reviewed-by: Dev <dev@example.com>" \
+		--trailer "$REVIEWED_BY_TRAILER" \
 		second third &&
 	git checkout --theirs file &&
 	git add file &&
 	git rebase --continue &&
-	test_commit_message HEAD third-signed
+	expect_trailer_msg HEAD "third"
 '
 
 test_expect_success 'rebase --root --trailer updates every commit' '
-	create_expect initial-signed "Initial empty commit" &&
-	create_expect first-signed "first" &&
 	git checkout first &&
 	git rebase --root \
-		--trailer "Reviewed-by: Dev <dev@example.com>" &&
-	test_commit_message HEAD   first-signed &&
-	test_commit_message HEAD^  initial-signed
+		--trailer "$REVIEWED_BY_TRAILER" &&
+	expect_trailer_msg HEAD  "first" &&
+	expect_trailer_msg HEAD^ "Initial empty commit"
 '
 test_done
