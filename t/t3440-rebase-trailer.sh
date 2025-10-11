@@ -87,7 +87,7 @@ test_expect_success 'rebase --root --trailer updates every commit' '
 	create_expect initial-signed "Initial empty commit" &&
 	create_expect first-signed "first" &&
 	git checkout first &&
-	git rebase --root --keep-empty \
+	git rebase --root \
 		--trailer "Reviewed-by: Dev <dev@example.com>" &&
 	test_commit_message HEAD   first-signed &&
 	test_commit_message HEAD^  initial-signed
