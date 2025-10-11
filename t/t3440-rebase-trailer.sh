@@ -73,13 +73,13 @@ test_expect_success 'CLI trailer duplicates allowed; replace policy keeps last' 
 
 test_expect_success 'multiple Signed-off-by trailers all preserved' '
 	git rebase -m \
-			--trailer "Signed-off-by: Dev A <a@ex.com>" \
-			--trailer "Signed-off-by: Dev B <b@ex.com>" HEAD~1 third &&
+			--trailer "Signed-off-by: Dev A <a@example.com>" \
+			--trailer "Signed-off-by: Dev B <b@example.com>" HEAD~1 third &&
 	cat >expect <<-\EOF &&
 	third
 
-	Signed-off-by: Dev A <a@ex.com>
-	Signed-off-by: Dev B <b@ex.com>
+	Signed-off-by: Dev A <a@example.com>
+	Signed-off-by: Dev B <b@example.com>
 	EOF
 	test_commit_message HEAD expect
 '
