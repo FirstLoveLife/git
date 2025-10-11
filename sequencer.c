@@ -209,6 +209,7 @@ static GIT_PATH_FUNC(rebase_path_reschedule_failed_exec, "rebase-merge/reschedul
 static GIT_PATH_FUNC(rebase_path_no_reschedule_failed_exec, "rebase-merge/no-reschedule-failed-exec")
 static GIT_PATH_FUNC(rebase_path_drop_redundant_commits, "rebase-merge/drop_redundant_commits")
 static GIT_PATH_FUNC(rebase_path_keep_redundant_commits, "rebase-merge/keep_redundant_commits")
+static GIT_PATH_FUNC(rebase_path_trailer, "rebase-merge/trailer")
 
 /*
  * A 'struct replay_ctx' represents the private state of the sequencer.
@@ -3244,6 +3245,17 @@ static int read_populate_opts(struct replay_opts *opts)
 
 		read_strategy_opts(opts, &buf);
 		strbuf_reset(&buf);
+		if (strbuf_read_file(&buf, rebase_path_trailer(), 0) >= 0) {
+			char *p = buf.buf, *nl;
+
+			while ((nl = strchr(p, '\n'))) {
+				*nl = '\0';
+				if (*p)
+					strvec_push(&opts->trailer_args, p);
+				p = nl + 1;
+			}
+			strbuf_reset(&buf);
+		}
 
 		if (read_oneliner(&ctx->current_fixups,
 				  rebase_path_current_fixups(),
@@ -3338,6 +3350,14 @@ int write_basic_state(struct replay_opts *opts, const char *head_name,
 		write_file(rebase_path_reschedule_failed_exec(), "%s", "");
 	else
 		write_file(rebase_path_no_reschedule_failed_exec(), "%s", "");
+	if (opts->trailer_args.nr) {
+		struct strbuf buf = STRBUF_INIT;
+
+		for (size_t i = 0; i < opts->trailer_args.nr; i++)
+			strbuf_addf(&buf, "%s\n", opts->trailer_args.v[i]);
+		write_file(rebase_path_trailer(), "%s", buf.buf);
+		strbuf_release(&buf);
+	}
 
 	return 0;
 }
