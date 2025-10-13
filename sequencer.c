@@ -2027,6 +2027,10 @@ static int append_squash_message(struct strbuf *buf, const char *body,
 		if (opts->signoff)
 			append_signoff(buf, 0, 0);
 
+		if (opts->trailer_args.nr &&
+			amend_strbuf_with_trailers(buf, &opts->trailer_args))
+			return error(_("unable to add trailers to commit message"));
+
 		if ((command == TODO_FIXUP) &&
 		    (flag & TODO_REPLACE_FIXUP_MSG) &&
 		    (file_exists(rebase_path_fixup_msg()) ||

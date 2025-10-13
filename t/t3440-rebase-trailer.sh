@@ -97,6 +97,33 @@ test_expect_success 'rebase -m --trailer adds trailer after conflicts' '
 	expect_trailer_msg HEAD^ "third"
 '
 
+test_expect_success '--trailer handles fixup commands in todo list' '
+	git checkout -B fixup-trailer HEAD &&
+	test_commit fixup-base base &&
+	test_commit fixup-second second &&
+	first_short=$(git rev-parse --short fixup-base) &&
+	second_short=$(git rev-parse --short fixup-second) &&
+	cat >todo <<EOF &&
+pick $first_short fixup-base
+fixup $second_short fixup-second
+EOF
+	(
+		set_replace_editor todo &&
+		git rebase -i --trailer "$REVIEWED_BY_TRAILER" HEAD~2
+	) &&
+	expect_trailer_msg HEAD "fixup-base" &&
+	git reset --hard fixup-second &&
+	cat >todo <<EOF &&
+pick $first_short fixup-base
+fixup -C $second_short fixup-second
+EOF
+	(
+		set_replace_editor todo &&
+		git rebase -i --trailer "$REVIEWED_BY_TRAILER" HEAD~2
+	) &&
+	expect_trailer_msg HEAD "fixup-second"
+'
+
 test_expect_success 'rebase --root --trailer updates every commit' '
 	git checkout first &&
 	git -c trailer.review.key=Reviewed-by rebase --root \
