@@ -52,10 +52,10 @@ test_expect_success 'reject trailer with missing key before separator' '
 
 test_expect_success 'allow trailer with missing value after separator' '
 	git rebase -m --trailer "Acked-by:" HEAD~1 third &&
-	cat >expect <<-\EOF &&
+	sed -e "s/_/ /g" <<-\EOF >expect &&
 	third
 
-	Acked-by: 
+	Acked-by:_
 	EOF
 	test_commit_message HEAD expect
 '
