@@ -25,6 +25,8 @@ static enum trailer_where where;
 static enum trailer_if_exists if_exists;
 static enum trailer_if_missing if_missing;
 
+static struct tempfile *trailers_tempfile;
+
 static int option_parse_where(const struct option *opt,
 			      const char *arg, int unset UNUSED)
 {
@@ -93,8 +95,6 @@ static int parse_opt_parse(const struct option *opt, const char *arg,
 	return 0;
 }
 
-static struct tempfile *trailers_tempfile;
-
 static FILE *create_in_place_tempfile(const char *file)
 {
 	struct stat st;
@@ -140,11 +140,9 @@ static void interpret_trailers(const struct process_trailer_options *opts,
 			       struct list_head *new_trailer_head,
 			       const char *file)
 {
+	FILE *outfile = stdout;
 	struct strbuf input = STRBUF_INIT;
 	struct strbuf out = STRBUF_INIT;
-	FILE *outfile = stdout;
-
-	trailer_config_init();
 
 	read_input_file(&input, file);
 
@@ -202,6 +200,8 @@ int cmd_interpret_trailers(int argc,
 			_("--trailer with --only-input does not make sense"),
 			git_interpret_trailers_usage,
 			options);
+
+	trailer_config_init();
 
 	if (argc) {
 		int i;
